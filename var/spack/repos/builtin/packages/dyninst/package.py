@@ -30,7 +30,7 @@ class Dyninst(Package):
     are executing without recompiling, re-linking, or re-executing."""
 
     homepage = "https://paradyn.org"
-    url      = "http://www.dyninst.org/sites/default/files/downloads/dyninst/8.1.2/DyninstAPI-8.1.2.tgz"
+    url = "https://github.com/dyninst/dyninst/archive/v9.2.0.tar.gz"
     list_url = "http://www.dyninst.org/downloads/dyninst-8.x"
 
     version('9.2.0', 'ad023f85e8e57837ed9de073b59d6bab',
@@ -50,7 +50,7 @@ class Dyninst(Package):
     depends_on('cmake', type='build')
 
     # new version uses cmake
-    def install(self, spec, prefix):
+    def install(self, spec, prefix):  # NOQA: ignore=F811
         libelf = spec['libelf'].prefix
         libdwarf = spec['libdwarf'].prefix
 
@@ -59,18 +59,20 @@ class Dyninst(Package):
                   '-DBoost_INCLUDE_DIR=%s'    % spec['boost'].prefix.include,
                   '-DBoost_LIBRARY_DIR=%s'    % spec['boost'].prefix.lib,
                   '-DBoost_NO_SYSTEM_PATHS=TRUE',
-                  '-DLIBELF_INCLUDE_DIR=%s'   % join_path(libelf.include, 'libelf'),
-                  '-DLIBELF_LIBRARIES=%s'     % join_path(libelf.lib, 'libelf.so'),
+                  '-DLIBELF_INCLUDE_DIR=%s'
+                  % join_path(libelf.include, 'libelf'),
+                  '-DLIBELF_LIBRARIES=%s'
+                  % join_path(libelf.lib, 'libelf.so'),
                   '-DLIBDWARF_INCLUDE_DIR=%s' % libdwarf.include,
-                  '-DLIBDWARF_LIBRARIES=%s'   % join_path(libdwarf.lib, 'libdwarf.so'),
+                  '-DLIBDWARF_LIBRARIES=%s'
+                  % join_path(libdwarf.lib, 'libdwarf.so'),
                   *std_cmake_args)
 
             make()
             make("install")
 
-
-    @when('@:8.1')
-    def install(self, spec, prefix):
+    @when('@:8.1')  # NOQA: ignore=F811
+    def install(self, spec, prefix):  # NOQA: ignore=F811
         configure("--prefix=" + prefix)
         make()
         make("install")
