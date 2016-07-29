@@ -50,7 +50,13 @@ class Dyninst(Package):
     depends_on('cmake', type='build')
 
     # new version uses cmake
-    def install(self, spec, prefix):  # NOQA: ignore=F811
+    def install(self, spec, prefix):
+        if spec.satisfies('@:8.1'):
+            configure("--prefix=" + prefix)
+            make()
+            make("install")
+            return
+            
         libelf = spec['libelf'].prefix
         libdwarf = spec['libdwarf'].prefix
 
@@ -70,9 +76,3 @@ class Dyninst(Package):
 
             make()
             make("install")
-
-    @when('@:8.1')  # NOQA: ignore=F811
-    def install(self, spec, prefix):  # NOQA: ignore=F811
-        configure("--prefix=" + prefix)
-        make()
-        make("install")
