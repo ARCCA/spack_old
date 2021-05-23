@@ -27,10 +27,13 @@ class IntelOneapiMpi(IntelOneApiLibraryPackage):
                 url='https://registrationcenter-download.intel.com/akdlm/irc_nas/17397/l_mpi_oneapi_p_2021.1.1.76_offline.sh',
                 sha256='8b7693a156c6fc6269637bef586a8fd3ea6610cac2aae4e7f48c1fbb601625fe',
                 expand=False)
-
+        
+    variant('i_mpi_ofi_internal', default=True, description='Enable internall libfabric support')
+    
     provides('mpi@:3')
 
-    depends_on('patchelf', type='build')
+    depends_on('patchelf', when='+i_mpi_ofi_internal', type='build')
+    depends_on('libfabric', when='~i_mpi_ofi_internal')
 
     @property
     def component_dir(self):
@@ -61,9 +64,11 @@ class IntelOneapiMpi(IntelOneApiLibraryPackage):
     @property
     def libs(self):
         libs = []
-        for dir in [join_path('lib', 'release_mt'),
-                    'lib',
-                    join_path('libfabric', 'lib')]:
+        used_dirs = [join_path('lib', 'release_mt'),
+                    'lib']
+        if '+i_mpi_ofi_internal' in self.spec:
+            used_dirs.append(join_path('libfabric', 'lib'))
+        for dir in used_dirs:
             lib_path = join_path(self.component_path, dir)
             ldir = find_libraries('*', root=lib_path, shared=True, recursive=False)
             libs += ldir
@@ -72,8 +77,9 @@ class IntelOneapiMpi(IntelOneApiLibraryPackage):
     def install(self, spec, prefix):
         super(IntelOneapiMpi, self).install(spec, prefix)
 
-        # need to patch libmpi.so so it can always find libfabric
-        libfabric_rpath = join_path(self.component_path, 'libfabric', 'lib')
-        for lib_version in ['debug', 'release', 'release_mt', 'debug_mt']:
-            file = join_path(self.component_path, 'lib', lib_version, 'libmpi.so')
-            subprocess.call(['patchelf', '--set-rpath', libfabric_rpath, file])
+        if '+i_mpi_ofi_internal' in spec:
+          # need to patch libmpi.so so it can always find libfabric
+          libfabric_rpath = join_path(self.component_path, 'libfabric', 'lib')
+          for lib_version in ['debug', 'release', 'release_mt', 'debug_mt']:
+              file = join_path(self.component_path, 'lib', lib_version, 'libmpi.so')
+              subprocess.call(['patchelf', '--set-rpath', libfabric_rpath, file])
