@@ -117,7 +117,7 @@ class PyNumpy(PythonPackage):
     patch('add_fj_compiler4.patch', when='@:1.13.3%fj')
     
     # Add ARM Compiler
-    patch('add_arm_compiler.patch', when='@1.20.0:1.21.4%arm')
+    patch('add_arm_compiler.patch', when='@1.21.4%arm')
 
     patch('check_executables.patch', when='@1.20.0:')
     patch('check_executables2.patch', when='@1.19.0:1.19.5')
