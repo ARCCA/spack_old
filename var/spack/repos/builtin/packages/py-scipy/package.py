@@ -103,6 +103,9 @@ class PyScipy(PythonPackage):
         args = []
         if spec.satisfies('%fj'):
             args.extend(['config_fc', '--fcompiler=fujitsu'])
+        if spec.satisfies('%arm'):
+            args.extend(['config_fc', '--fcompiler=arm'])
+
 
         # Build in parallel
         # Known problems with Python 3.5+
