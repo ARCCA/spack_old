@@ -69,14 +69,24 @@ def get_armpl_prefix(spec):
     else:
         sve_flag = ''
 
-    return os.path.join(
-        acfl_prefix,
-        'armpl-{0}_AArch64{1}_{2}_arm-linux-compiler_aarch64-linux'.format(
-            spec.version,
-            sve_flag,
-            get_os(spec)
+    if spec.satisfies('%gcc'):
+        return os.path.join(
+            acfl_prefix,
+            'armpl-{0}_AArch64{1}_{2}_gcc_aarch64-linux'.format(
+                spec.version,
+                sve_flag,
+                get_os(spec)
+            )
         )
-    )
+    else:
+        return os.path.join(
+            acfl_prefix,
+            'armpl-{0}_AArch64{1}_{2}_arm-linux-compiler_aarch64-linux'.format(
+                spec.version,
+                sve_flag,
+                get_os(spec)
+            )
+        )
 
 
 class Arm(Package):
@@ -120,6 +130,9 @@ class Arm(Package):
     conflicts('target=ppc64le:', msg='Only available on Aarch64')
 
     executables = [r'armclang', r'armclang\+\+', r'armflang']
+
+    # Set compiler dependency mapping
+    conflicts('%gcc@:9.99.99', when='@21.0.0%gcc', msg='ArmPL 21.0 requires GCC@10')
 
     # Licensing
     license_required = True
