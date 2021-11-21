@@ -10,6 +10,8 @@ _os_map = {
     'ubuntu18.04': 'Ubuntu-18.04',
     'ubuntu20.04': 'Ubuntu-20.04',
     'sles15': 'SLES-15',
+    'rhel7': 'RHEL-7',
+    'rhel8': 'RHEL-8',
     'centos7': 'RHEL-7',
     'centos8': 'RHEL-8',
     'amzn2': 'RHEL-7'
@@ -42,8 +44,8 @@ _versions = {
 }
 
 
-def get_os():
-    spack_os = spack.platforms.host().default_os
+def get_os(spec):
+    spack_os = spec.os
     return _os_map.get(spack_os, 'RHEL-7')
 
 
@@ -53,7 +55,26 @@ def get_acfl_prefix(spec):
         acfl_prefix,
         'arm-linux-compiler-{0}_Generic-AArch64_{1}_aarch64-linux'.format(
             spec.version,
-            get_os()
+            get_os(spec)
+        )
+    )
+
+def get_armpl_prefix(spec):
+
+    acfl_prefix = spec.prefix
+
+    # SVE
+    if spec.satisfies('+sve'):
+        sve_flag = '-SVE'
+    else:
+        sve_flag = ''
+
+    return os.path.join(
+        acfl_prefix,
+        'armpl-{0}_AArch64{1}_{2}_arm-linux-compiler_aarch64-linux'.format(
+            spec.version,
+            sve_flag,
+            get_os(spec)
         )
     )
 
@@ -69,13 +90,29 @@ class Arm(Package):
     maintainers = ['OliverPerks']
 
     # Build Versions: establish OS for URL
-    acfl_os = get_os()
+    acfl_os = get_os(spec)
 
     # Build Versions
     for ver, packages in _versions.items():
         pkg = packages.get(acfl_os)
         if pkg:
             version(ver, sha256=pkg[0], url=pkg[1])
+    
+    variant('sve', default=False, description='SVE enabled Armpl library')
+    variant('ilp64', default=False, description='use ilp64 specific Armpl library')
+    variant('shared', default=True, description='enable shared libs')
+    # Try to match the OpenBLAS threads variant format
+    variant(
+        'threads', default='none',
+        description='Multithreading support',
+        values=('openmp', 'none'),
+        multi=False
+    )
+
+    provides('blas')
+    provides('lapack')
+    provides('fftw-api@3')
+
 
     # Only install for Aarch64
     conflicts('target=x86_64:', msg='Only available on Aarch64')
@@ -152,12 +189,80 @@ class Arm(Package):
         if self.spec.external:
             return self.spec.extra_attributes['compilers'].get('fortran', None)
         return join_path(get_acfl_prefix(self.spec), 'bin', 'armflang')
+    
+    @property
+    def blas_libs(self):
+
+        armpl_prefix = get_armpl_prefix(self.spec)
+
+        shared = True if '+shared' in self.spec else False
+        if '+ilp64' in self.spec and self.spec.satisfies('threads=openmp'):
+            libname = 'libarmpl_ilp64_mp'
+        elif '+ilp64' in self.spec:
+            libname = 'libarmpl_ilp64'
+        elif self.spec.satisfies('threads=openmp'):
+            libname = 'libarmpl_mp'
+        else:
+            libname = 'libarmpl'
+
+        # Get ArmPL Lib
+        armpl_libs = find_libraries(
+            [libname, 'libamath', 'libastring'],
+            root=armpl_prefix,
+            shared=shared,
+            recursive=True)
+
+        armpl_libs += find_system_libraries(['libm'])
+
+        # Get additional libs
+        # Find prefix of compiler
+        arm_prefix = ancestor(self.compiler.cc, 2)
+        # Search for libgfortran in this prefix
+        arm_res = find_libraries(
+            ['libflang', 'libflangrti'],
+            root=arm_prefix,
+            recursive=True
+        )
+        # Add to library path
+        armpl_libs += arm_res
+
+        return armpl_libs
+
+    @property
+    def lapack_libs(self):
+        return self.blas_libs
+
+    @property
+    def fftw_libs(self):
+        return self.blas_libs
+
+    @property
+    def libs(self):
+        return self.blas_libs
+
+    @property
+    def headers(self):
+        armpl_dir = get_armpl_prefix(self.spec)
+        suffix = 'include'
+        if self.spec.satisfies('+ilp64'):
+            suffix += '_ilp64'
+        if self.spec.satisfies('threads=openmp'):
+            suffix += '_mp'
+        incdir = join_path(armpl_dir, suffix)
+
+        hlist = find_all_headers(incdir)
+        hlist.directories = [incdir]
+        return hlist
+
 
     def setup_run_environment(self, env):
         arm_dir = get_acfl_prefix(self.spec)
+        armpl_dir = get_armpl_prefix(self.spec)
         env.set("ARM_LINUX_COMPILER_DIR", arm_dir)
         env.set("ARM_LINUX_COMPILER_INCLUDES", join_path(arm_dir, 'includes'))
+        env.set("ARMPL_DIR", armpl_dir)
         env.prepend_path("LD_LIBRARY_PATH", join_path(arm_dir, 'lib'))
+        env.prepend_path("LD_LIBRARY_PATH", join_path(armpl_dir, 'lib'))
         env.prepend_path("PATH", join_path(arm_dir, 'bin'))
         env.prepend_path("CPATH", join_path(arm_dir, 'include'))
         env.prepend_path("MANPATH", join_path(arm_dir, 'share', 'man'))
